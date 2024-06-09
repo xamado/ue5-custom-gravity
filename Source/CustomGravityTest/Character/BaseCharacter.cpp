@@ -20,6 +20,7 @@
 #include "Engine/Canvas.h"
 #include "Animation/AnimInstance.h"
 #include "Engine/DamageEvents.h"
+#include "BaseRootMotionSource.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(BaseCharacter)
 
@@ -1057,7 +1058,7 @@ void ABaseCharacter::LaunchCharacter(FVector LaunchVelocity, bool bXYOverride, b
 }
 
 
-void ABaseCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PrevCustomMode)
+void ABaseCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode)
 {
 	if (!bPressedJump || !CharacterMovement->IsFalling())
 	{
@@ -1070,8 +1071,8 @@ void ABaseCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8
 		ProxyJumpForceStartedTime = GetWorld()->GetTimeSeconds();
 	}
 
-	K2_OnMovementModeChanged(PrevMovementMode, CharacterMovement->MovementMode, PrevCustomMode, CharacterMovement->CustomMovementMode);
-	MovementModeChangedDelegate.Broadcast(this, PrevMovementMode, PrevCustomMode);
+	K2_OnMovementModeChanged(PrevMovementMode, CharacterMovement->MovementMode);
+	MovementModeChangedDelegate.Broadcast(this, PrevMovementMode);
 }
 
 
@@ -1745,7 +1746,7 @@ void ABaseCharacter::ClientCheatGhost_Implementation()
 void ABaseCharacter::RootMotionDebugClientPrintOnScreen_Implementation(const FString& InString)
 {
 #if ROOT_MOTION_DEBUG
-	RootMotionSourceDebug::PrintOnScreenServerMsg(InString);
+	BaseRootMotionSourceDebug::PrintOnScreenServerMsg(InString);
 #endif
 }
 
@@ -1869,44 +1870,3 @@ void ABaseCharacter::ClientAdjustRootMotionSourcePosition_Implementation(float T
 {
 	GetCharacterMovement()->ClientAdjustRootMotionSourcePosition_Implementation(TimeStamp, ServerRootMotion, bHasAnimRootMotion, ServerMontageTrackPosition, ServerLoc, ServerRotation, ServerVelZ, ServerBase, ServerBoneName, bHasBase, bBaseRelativePosition, ServerMovementMode);
 }
-
-void ABaseCharacter::FillAsyncInput(FBaseCharacterAsyncInput& Input) const
-{
-	Input.JumpMaxHoldTime = GetJumpMaxHoldTime();
-	Input.JumpMaxCount = JumpMaxCount;
-	Input.LocalRole = ENetRole::ROLE_Authority;//CharacterOwner->GetLocalRole(); Override as we aren't currently replicating to server. TODO NetRole
-	Input.RemoteRole = GetRemoteRole();
-	Input.bIsLocallyControlled = true;// CharacterOwner->IsLocallyControlled(); TODO NetRole
-	Input.bIsPlayingNetworkedRootMontage = IsPlayingNetworkedRootMotionMontage();
-	Input.bUseControllerRotationPitch = bUseControllerRotationPitch;
-	Input.bUseControllerRotationYaw = bUseControllerRotationYaw;
-	Input.bUseControllerRotationRoll = bUseControllerRotationRoll;
-	Input.ControllerDesiredRotation = Controller->GetDesiredRotation();
-}
-
-void ABaseCharacter::InitializeAsyncOutput(FBaseCharacterAsyncOutput& Output) const
-{
-	Output.Rotation = GetActorRotation();
-	Output.JumpCurrentCountPreJump = JumpCurrentCountPreJump;
-	Output.JumpCurrentCount = JumpCurrentCount;
-	Output.JumpForceTimeRemaining = JumpForceTimeRemaining;
-	Output.bWasJumping = bWasJumping;
-	Output.bPressedJump = bPressedJump;
-	Output.JumpKeyHoldTime = JumpKeyHoldTime;
-	Output.bClearJumpInput = false;
-}
-
-void ABaseCharacter::ApplyAsyncOutput(const FBaseCharacterAsyncOutput& Output)
-{
-	JumpCurrentCountPreJump = Output.JumpCurrentCountPreJump;
-	JumpCurrentCount = Output.JumpCurrentCount;
-	JumpForceTimeRemaining = Output.JumpForceTimeRemaining;
-	bWasJumping = Output.bWasJumping;
-	JumpKeyHoldTime = Output.JumpKeyHoldTime;
-
-	if (Output.bClearJumpInput)
-	{
-		bPressedJump = false;
-	}
-}
-

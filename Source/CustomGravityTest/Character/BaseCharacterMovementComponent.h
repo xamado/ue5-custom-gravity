@@ -19,7 +19,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "BaseCharacterMovementReplication.h"
 #include "Interfaces/NetworkPredictionInterface.h"
-#include "BaseCharacterMovementComponentAsync.h"
+#include "BaseCharacterMovementComponentCommon.h"
 #include "BaseCharacterMovementComponent.generated.h"
 
 class ABaseCharacter;
@@ -40,8 +40,6 @@ namespace CharacterMovementConstants
 
 namespace BaseCharacterMovementCVars
 {
-	// Is Async Character Movement enabled?
-	extern int32 AsyncCharacterMovement;
 	extern int32 ForceJumpPeakSubstep;
 }
 
@@ -166,16 +164,10 @@ public:
 	UPROPERTY(Category="Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, AdvancedDisplay, meta=(ClampMin="0", UIMin="0"))
 	float JumpOffJumpZFactor;
 
-
-private:
-	FBaseCharacterMovementComponentAsyncCallback* AsyncCallback;
-
 protected:
-	// This is the most recent async state from simulated. Only safe for access on physics thread.
-	TSharedPtr<FBaseCharacterMovementComponentAsyncOutput, ESPMode::ThreadSafe> AsyncSimState;
 	bool bMovementModeDirty = false; // Gamethread changed movement mode, need to update sim.
-private:
 
+private:
 	/**
 	 * Max angle in degrees of a walkable surface. Any greater than this and it is too steep to be walkable.
 	 */
@@ -227,15 +219,7 @@ public:
 	 */
 	UPROPERTY(Category="Character Movement: MovementMode", BlueprintReadOnly)
 	TEnumAsByte<enum EMovementMode> MovementMode;
-
-	/**
-	 * Current custom sub-mode if MovementMode is set to Custom.
-	 * This is automatically replicated through the Character owner and for client-server movement functions.
-	 * @see SetMovementMode()
-	 */
-	UPROPERTY(Category="Character Movement: MovementMode", BlueprintReadOnly)
-	uint8 CustomMovementMode;
-
+	
 	/** The default direction that gravity points for movement simulation.  */
 	static const FVector DefaultGravityDirection;
 
@@ -274,10 +258,6 @@ public:
 	/** The maximum flying speed. */
 	UPROPERTY(Category="Character Movement: Flying", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
 	float MaxFlySpeed;
-
-	/** The maximum speed when using Custom movement mode. */
-	UPROPERTY(Category="Character Movement: Custom Movement", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
-	float MaxCustomMovementSpeed;
 
 	/** Max Acceleration (rate of change of velocity) */
 	UPROPERTY(Category="Character Movement (General Settings)", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
@@ -1227,10 +1207,9 @@ public:
 	 * Change movement mode.
 	 *
 	 * @param NewMovementMode	The new movement mode
-	 * @param NewCustomMode		The new custom sub-mode, only applicable if NewMovementMode is Custom.
 	 */
 	UFUNCTION(BlueprintCallable, Category="Pawn|Components|CharacterMovement")
-	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0);
+	virtual void SetMovementMode(EMovementMode NewMovementMode);
 
 	/**
 	 * Set movement mode to use when returning to walking movement (either MOVE_Walking or MOVE_NavWalking).
@@ -1252,7 +1231,7 @@ public:
 protected:
 
 	/** Called after MovementMode has changed. Base implementation does special handling for starting certain modes, then notifies the CharacterOwner. */
-	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode);
+	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode);
 
 public:
 
@@ -1894,9 +1873,6 @@ protected:
 	/** @note Movement update functions should only be called through StartNewPhysics()*/
 	virtual void PhysSwimming(float deltaTime, int32 Iterations);
 
-	/** @note Movement update functions should only be called through StartNewPhysics()*/
-	virtual void PhysCustom(float deltaTime, int32 Iterations);
-
 	/* Allow custom handling when character hits a wall while swimming. */
 	virtual void HandleSwimmingWallHit(const FHitResult& Hit, float DeltaTime);
 
@@ -2144,22 +2120,6 @@ protected:
 	 * @param MoveOnBaseHit		Hit result for the object we hit when trying to move with the base.
 	 */
 	virtual void OnUnableToFollowBaseMove(const FVector& DeltaPosition, const FVector& OldLocation, const FHitResult& MoveOnBaseHit);
-
-
-protected:
-	/* Prepare root motion to be passed on to physics thread */
-	virtual void AccumulateRootMotionForAsync(float DeltaSeconds, FBaseRootMotionAsyncData& RootMotion);
-	/* Prepare inputs for asynchronous simulation on physics thread */ 
-	virtual void FillAsyncInput(const FVector& InputVector, FBaseCharacterMovementComponentAsyncInput& AsyncInput);
-	virtual void BuildAsyncInput();
-	virtual void PostBuildAsyncInput();
-	/* Apply outputs from async sim. */
-	virtual void ApplyAsyncOutput(FBaseCharacterMovementComponentAsyncOutput& Output);
-	virtual void ProcessAsyncOutput();
-	
-	/* Register async callback with physics system. */
-	virtual void RegisterAsyncCallback();
-	virtual bool IsAsyncCallbackRegistered() const;
 	
 public:
 
@@ -2658,8 +2618,6 @@ public:
 
 	UPROPERTY(Transient)
 	FBaseRootMotionSourceGroup ServerCorrectionRootMotion;
-
-	FBaseRootMotionAsyncData AsyncRootMotion;
 
 	/** Returns true if we have Root Motion from any source to use in PerformMovement() physics. */
 	bool HasRootMotionSources() const;

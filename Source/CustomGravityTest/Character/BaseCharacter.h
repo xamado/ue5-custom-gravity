@@ -30,7 +30,7 @@ struct FAnimMontageInstance;
 struct FBaseCharacterAsyncInput;
 struct FBaseCharacterAsyncOutput;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FMovementModeChangedSignature, class ABaseCharacter*, Character, EMovementMode, PrevMovementMode, uint8, PreviousCustomMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMovementModeChangedSignature, class ABaseCharacter*, Character, EMovementMode, PrevMovementMode);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FCharacterMovementUpdatedSignature, float, DeltaSeconds, FVector, OldLocation, FVector, OldVelocity);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCharacterReachedApexSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLandedSignature, const FHitResult&, Hit);
@@ -872,9 +872,8 @@ public:
 	/**
 	 * Called from CharacterMovementComponent to notify the character that the movement mode has changed.
 	 * @param	PrevMovementMode	Movement mode before the change
-	 * @param	PrevCustomMode		Custom mode before the change (applicable if PrevMovementMode is Custom)
 	 */
-	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode = 0);
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode);
 
 	/** Multicast delegate for MovementMode changing. */
 	UPROPERTY(BlueprintAssignable, Category=Character)
@@ -884,19 +883,9 @@ public:
 	 * Called from CharacterMovementComponent to notify the character that the movement mode has changed.
 	 * @param	PrevMovementMode	Movement mode before the change
 	 * @param	NewMovementMode		New movement mode
-	 * @param	PrevCustomMode		Custom mode before the change (applicable if PrevMovementMode is Custom)
-	 * @param	NewCustomMode		New custom mode (applicable if NewMovementMode is Custom)
 	 */
 	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName="OnMovementModeChanged", ScriptName="OnMovementModeChanged"))
-	void K2_OnMovementModeChanged(EMovementMode PrevMovementMode, EMovementMode NewMovementMode, uint8 PrevCustomMode, uint8 NewCustomMode);
-
-	/**
-	 * Event for implementing custom character movement mode. Called by CharacterMovement if MovementMode is set to Custom.
-	 * @note C++ code should override UBaseCharacterMovementComponent::PhysCustom() instead.
-	 * @see UBaseCharacterMovementComponent::PhysCustom()
-	 */
-	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName="UpdateCustomMovement", ScriptName="UpdateCustomMovement"))
-	void K2_UpdateCustomMovement(float DeltaTime);
+	void K2_OnMovementModeChanged(EMovementMode PrevMovementMode, EMovementMode NewMovementMode);
 
 	/**
 	 * Event triggered at the end of a CharacterMovementComponent movement update.
@@ -1032,9 +1021,4 @@ public:
 	 * Called for everyone when recording a Client Replay, including Simulated Proxies.
 	 */
 	virtual void PreReplicationForReplay(IRepChangedPropertyTracker& ChangedPropertyTracker) override;
-
-	/** Async simulation API */
-	void FillAsyncInput(FBaseCharacterAsyncInput& Input) const;
-	void InitializeAsyncOutput(FBaseCharacterAsyncOutput& Output) const;
-	void ApplyAsyncOutput(const FBaseCharacterAsyncOutput& Output);
 };
