@@ -353,7 +353,7 @@ namespace BaseCharacterMovementCVars
 
 	static int32 VisualizeMovement = 0;
 	FAutoConsoleVariableRef CVarVisualizeMovement(
-		TEXT("p.VisualizeMovement"),
+		TEXT("cg.VisualizeMovement"),
 		VisualizeMovement,
 		TEXT("Whether to draw in-world debug information for character movement.\n")
 		TEXT("0: Disable, 1: Enable"),
@@ -7365,66 +7365,90 @@ void UBaseCharacterMovementComponent::DisplayDebug(UCanvas* Canvas, const FDebug
 
 float UBaseCharacterMovementComponent::VisualizeMovement() const
 {
-	float HeightOffset = 0.f;
-	const float OffsetPerElement = 10.0f;
 	if (CharacterOwner == nullptr)
 	{
-		return HeightOffset;
+		return 0.0f;
 	}
 
+	float HeightOffset = 0.0f;
+	const float OffsetPerElement = 10.0f;
+
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	const FVector TopOfCapsule = GetActorLocation() + FVector(0.f, 0.f, CharacterOwner->GetSimpleCollisionHalfHeight());
-	
+	const FVector CapsuleUp = GetGravityDirection() * -1.0f;
+	const FVector TopOfCapsule = GetActorLocation() + CapsuleUp * CharacterOwner->GetSimpleCollisionHalfHeight();
+
+	// Server/Client
+	{
+		const FColor DebugColor = CharacterOwner->GetLocalRole() == ROLE_AutonomousProxy ? FColor::Green : CharacterOwner->GetLocalRole() == ROLE_Authority ? FColor::Red : FColor::Yellow;
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
+		FString DebugText = CharacterOwner->GetLocalRole() == ROLE_AutonomousProxy ? "AutonomousProxy" : CharacterOwner->GetLocalRole() == ROLE_Authority ? "Authority" : "Simulated";
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
+	}
+
 	// Position
 	{
 		const FColor DebugColor = FColor::White;
-		const FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
+		HeightOffset += OffsetPerElement;
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 		FString DebugText = FString::Printf(TEXT("Position: %s"), *GetActorLocation().ToCompactString());
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
+	}
+
+	// Rotation
+	{
+		const FColor DebugColor = FColor::White;
+		HeightOffset += OffsetPerElement;
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
+
+		DrawDebugCoordinateSystem(GetWorld(), DebugLocation + CapsuleUp * -5.0f, UpdatedComponent->GetComponentRotation(),
+			100.0f, false, -1.0f, 0, 2.0f);
+
+		FString DebugText = FString::Printf(TEXT("Rotation: %s"), *UpdatedComponent->GetComponentRotation().ToCompactString());
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 
 	// Velocity
 	{
 		const FColor DebugColor = FColor::Green;
 		HeightOffset += OffsetPerElement;
-		const FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
-		DrawDebugDirectionalArrow(GetWorld(), DebugLocation - FVector(0.f, 0.f, 5.0f), DebugLocation - FVector(0.f, 0.f, 5.0f) + Velocity,
-			100.f, DebugColor, false, -1.f, (uint8)'\000', 10.f);
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
+		DrawDebugDirectionalArrow(GetWorld(), DebugLocation + CapsuleUp * -5.0f, DebugLocation + CapsuleUp * -5.0f + Velocity,
+			100.0f, DebugColor, false, -1.0f, (uint8)'\000', 10.0f);
 
 		FString DebugText = FString::Printf(TEXT("Velocity: %s (Speed: %.2f) (Max: %.2f)"), *Velocity.ToCompactString(), Velocity.Size(), GetMaxSpeed());
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 
 	// Acceleration
 	{
 		const FColor DebugColor = FColor::Yellow;
 		HeightOffset += OffsetPerElement;
-		const float MaxAccelerationLineLength = 200.f;
+		const float MaxAccelerationLineLength = 200.0f;
 		const float CurrentMaxAccel = GetMaxAcceleration();
-		const float CurrentAccelAsPercentOfMaxAccel = CurrentMaxAccel > 0.f ? Acceleration.Size() / CurrentMaxAccel : 1.f;
-		const FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
-		DrawDebugDirectionalArrow(GetWorld(), DebugLocation - FVector(0.f, 0.f, 5.0f), 
-			DebugLocation - FVector(0.f, 0.f, 5.0f) + Acceleration.GetSafeNormal(UE_SMALL_NUMBER) * CurrentAccelAsPercentOfMaxAccel * MaxAccelerationLineLength,
-			25.f, DebugColor, false, -1.f, (uint8)'\000', 8.f);
+		const float CurrentAccelAsPercentOfMaxAccel = CurrentMaxAccel > 0.0f ? Acceleration.Size() / CurrentMaxAccel : 1.0f;
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
+		DrawDebugDirectionalArrow(GetWorld(), DebugLocation + CapsuleUp * -5.0f,
+			DebugLocation + CapsuleUp * -5.0f + Acceleration.GetSafeNormal(UE_SMALL_NUMBER) * CurrentAccelAsPercentOfMaxAccel * MaxAccelerationLineLength,
+			25.0f, DebugColor, false, -1.0f, (uint8)'\000', 8.0f);
 
 		FString DebugText = FString::Printf(TEXT("Acceleration: %s"), *Acceleration.ToCompactString());
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 
 	// Movement Mode
 	{
 		const FColor DebugColor = FColor::Blue;
 		HeightOffset += OffsetPerElement;
-		FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
+		FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 		FString DebugText = FString::Printf(TEXT("MovementMode: %s"), *GetMovementName());
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 
 		if (IsInWater())
 		{
 			HeightOffset += OffsetPerElement;
-			DebugLocation = TopOfCapsule + FVector(0.f, 0.f, HeightOffset);
+			DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 			DebugText = FString::Printf(TEXT("ImmersionDepth: %.2f"), ImmersionDepth());
-			DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+			DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 		}
 	}
 
@@ -7432,9 +7456,20 @@ float UBaseCharacterMovementComponent::VisualizeMovement() const
 	{
 		const FColor DebugColor = FColor::Blue;
 		HeightOffset += OffsetPerElement;
-		FVector DebugLocation = TopOfCapsule + FVector(0.f, 0.f, HeightOffset);
+		FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 		FString DebugText = FString::Printf(TEXT("bIsJumping: %d Count: %d HoldTime: %.2f"), CharacterOwner->bPressedJump, CharacterOwner->JumpCurrentCount, CharacterOwner->JumpKeyHoldTime);
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
+	}
+
+	// Base
+	{
+		UPrimitiveComponent* Base = this->GetMovementBase();
+		
+		const FColor DebugColor = FColor::Blue;
+		HeightOffset += OffsetPerElement;
+		FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
+		FString DebugText = FString::Printf(TEXT("base: %s"), Base ? *Base->GetName() : TEXT("n/a"));
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 
 	// Root motion (additive)
@@ -7442,17 +7477,17 @@ float UBaseCharacterMovementComponent::VisualizeMovement() const
 	{
 		const FColor DebugColor = FColor::Cyan;
 		HeightOffset += OffsetPerElement;
-		const FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 
 		FVector CurrentAdditiveVelocity(FVector::ZeroVector);
-		CurrentRootMotion.AccumulateAdditiveRootMotionVelocity(0.f, *CharacterOwner, *this, CurrentAdditiveVelocity);
+		CurrentRootMotion.AccumulateAdditiveRootMotionVelocity(0.0f, *CharacterOwner, *this, CurrentAdditiveVelocity);
 
-		DrawDebugDirectionalArrow(GetWorld(), DebugLocation, DebugLocation + CurrentAdditiveVelocity, 
-			100.f, DebugColor, false, -1.f, (uint8)'\000', 10.f);
+		DrawDebugDirectionalArrow(GetWorld(), DebugLocation, DebugLocation + CurrentAdditiveVelocity,
+			100.0f, DebugColor, false, -1.0f, (uint8)'\000', 10.0f);
 
-		FString DebugText = FString::Printf(TEXT("RootMotionAdditiveVelocity: %s (Speed: %.2f)"), 
+		FString DebugText = FString::Printf(TEXT("RootMotionAdditiveVelocity: %s (Speed: %.2f)"),
 			*CurrentAdditiveVelocity.ToCompactString(), CurrentAdditiveVelocity.Size());
-		DrawDebugString(GetWorld(), DebugLocation + FVector(0.f,0.f,5.f), DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation + CapsuleUp * 5.0f, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 
 	// Root motion (override)
@@ -7460,9 +7495,9 @@ float UBaseCharacterMovementComponent::VisualizeMovement() const
 	{
 		const FColor DebugColor = FColor::Green;
 		HeightOffset += OffsetPerElement;
-		const FVector DebugLocation = TopOfCapsule + FVector(0.f,0.f,HeightOffset);
+		const FVector DebugLocation = TopOfCapsule + CapsuleUp * HeightOffset;
 		FString DebugText = FString::Printf(TEXT("Has Override RootMotion"));
-		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.f, true);
+		DrawDebugString(GetWorld(), DebugLocation, DebugText, nullptr, DebugColor, 0.0f, true);
 	}
 #endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 
