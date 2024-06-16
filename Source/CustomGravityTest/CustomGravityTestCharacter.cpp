@@ -92,10 +92,19 @@ void ACustomGravityTestCharacter::Tick(float DeltaSeconds)
 	
 			if (MovementComponent->MovementMode == EMovementMode::MOVE_Flying)
 				MovementComponent->SetMovementMode(EMovementMode::MOVE_Walking);
+
+			// AActor* Base = GravityOverlapResult.GetActor();
+			// UPrimitiveComponent* BasePrimitiveRoot = Cast<UPrimitiveComponent>(Base->GetRootComponent());
+			// if (BasePrimitiveRoot)
+			{
+				SetBase(GravityOverlapResult.GetComponent());
+			}
 		}
 		else
 		{
 			MovementComponent->SetMovementMode(EMovementMode::MOVE_Flying);
+
+			SetBase(nullptr);
 		}
 	}
 }
@@ -113,7 +122,7 @@ void ACustomGravityTestCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ABaseCharacter::StopJumping);
 
 		// Moving
-		// EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ACustomGravityTestCharacter::Move);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ACustomGravityTestCharacter::Move);
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ACustomGravityTestCharacter::Look);
@@ -134,17 +143,15 @@ void ACustomGravityTestCharacter::Move(const FInputActionValue& Value)
 		// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
 
-		FRotator GravityRotation = ACustomGravityTestPlayerController::GetGravityRelativeRotation(Rotation, GetCharacterMovement()->GetGravityDirection());
+		// FRotator GravityRotation = ACustomGravityTestPlayerController::GetGravityRelativeRotation(Rotation, GetCharacterMovement()->GetGravityDirection());
+		// FRotator RotatorForSideMovement = ACustomGravityTestPlayerController::GetGravityWorldRotation(FRotator(0.0f, GravityRotation.Yaw, GravityRotation.Roll), GetCharacterMovement()->GetGravityDirection());
+		// FRotator RotatorForForwardMovement = ACustomGravityTestPlayerController::GetGravityWorldRotation(FRotator(0.0f, GravityRotation.Yaw, 0.0f), GetCharacterMovement()->GetGravityDirection());
+		// const FVector ForwardDirection = FRotationMatrix(RotatorForForwardMovement).GetUnitAxis(EAxis::Y);
+		// const FVector RightDirection = FRotationMatrix(RotatorForSideMovement).GetUnitAxis(EAxis::X);
 
-		FRotator RotatorForSideMovement = ACustomGravityTestPlayerController::GetGravityWorldRotation(FRotator(0.0f, GravityRotation.Yaw, GravityRotation.Roll), GetCharacterMovement()->GetGravityDirection());
-		FRotator RotatorForForwardMovement = ACustomGravityTestPlayerController::GetGravityWorldRotation(FRotator(0.0f, GravityRotation.Yaw, 0.0f), GetCharacterMovement()->GetGravityDirection());
-				
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(RotatorForForwardMovement).GetUnitAxis(EAxis::Y);
-	
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(RotatorForSideMovement).GetUnitAxis(EAxis::X);
-
+		const FVector ForwardDirection = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
+		const FVector RightDirection = FRotationMatrix(Rotation).GetUnitAxis(EAxis::X);
+		
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.X);
 		AddMovementInput(RightDirection, MovementVector.Y);

@@ -1225,7 +1225,7 @@ void UBaseCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previo
 		// make sure we update our new floor/base on initial entry of the walking physics
 		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
 		AdjustFloorHeight();
-		SetBaseFromFloor(CurrentFloor);
+		// SetBaseFromFloor(CurrentFloor);
 	}
 	else
 	{
@@ -1234,8 +1234,8 @@ void UBaseCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previo
 
 		if (MovementMode == MOVE_Falling)
 		{
-			DecayingFormerBaseVelocity = GetImpartedMovementBaseVelocity();
-			Velocity += DecayingFormerBaseVelocity;
+			// DecayingFormerBaseVelocity = GetImpartedMovementBaseVelocity();
+			// Velocity += DecayingFormerBaseVelocity;
 			if (bMovementInProgress && CurrentRootMotion.HasAdditiveVelocity())
 			{
 				// If we leave a base during movement and we have additive root motion, we need to add the imparted velocity so that it retains it next tick
@@ -1248,7 +1248,7 @@ void UBaseCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previo
 			CharacterOwner->Falling();
 		}
 
-		SetBase(NULL);
+		// SetBase(NULL);
 
 		if (MovementMode == MOVE_None)
 		{
@@ -2053,7 +2053,7 @@ void UBaseCharacterMovementComponent::SimulateMovement(float DeltaSeconds)
 					if (IsMovingOnGround())
 					{
 						AdjustFloorHeight();
-						SetBase(CurrentFloor.HitResult.Component.Get(), CurrentFloor.HitResult.BoneName);
+						// SetBase(CurrentFloor.HitResult.Component.Get(), CurrentFloor.HitResult.BoneName);
 					}
 					else if (MovementMode == MOVE_Falling)
 					{
@@ -2128,11 +2128,11 @@ void UBaseCharacterMovementComponent::SetBaseFromFloor(const FBaseFindFloorResul
 {
 	if (FloorResult.IsWalkableFloor())
 	{
-		SetBase(FloorResult.HitResult.GetComponent(), FloorResult.HitResult.BoneName);
+		// SetBase(FloorResult.HitResult.GetComponent(), FloorResult.HitResult.BoneName);
 	}
 	else
 	{
-		SetBase(nullptr);
+		// SetBase(nullptr);
 	}
 }
 
@@ -5324,7 +5324,7 @@ void UBaseCharacterMovementComponent::PhysWalking(float deltaTime, int32 Iterati
 				}
 
 				AdjustFloorHeight();
-				SetBase(CurrentFloor.HitResult.Component.Get(), CurrentFloor.HitResult.BoneName);
+				// SetBase(CurrentFloor.HitResult.Component.Get(), CurrentFloor.HitResult.BoneName);
 			}
 			else if (CurrentFloor.HitResult.bStartPenetrating && remainingTime <= 0.f)
 			{
@@ -7524,7 +7524,10 @@ FVector UBaseCharacterMovementComponent::ConstrainInputAcceleration(const FVecto
 	const double InputAccelerationDotGravityNormal = FVector::DotProduct(InputAcceleration, -GetGravityDirection());
 	if (!FMath::IsNearlyZero(InputAccelerationDotGravityNormal) && (IsMovingOnGround() || IsFalling()))
 	{
-		return FVector::VectorPlaneProject(InputAcceleration, -GetGravityDirection());
+		// XA: Normalize the vector after projecting so that we have a constant movement speed even if camera
+		// is looking down into the floor.
+		const FVector ProjectedOnPlane = FVector::VectorPlaneProject(InputAcceleration, -GetGravityDirection());
+		return ProjectedOnPlane.GetSafeNormal();
 	}
 
 	return InputAcceleration;
